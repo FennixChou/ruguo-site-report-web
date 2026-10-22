@@ -21,7 +21,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI","Micr
 .btn:disabled{opacity:.55}
 .btn.big{padding:22px;font-size:21px}
 .btn.secondary{background:var(--surface);color:var(--primary);border:1px solid var(--primary)}
-.btn.link{background:transparent;color:var(--muted);font-weight:500}
+.btn.link{background:transparent;color:var(--muted);font-weight:500;width:auto;margin:22px auto 10px;padding:10px 22px;text-decoration:underline}
+/* 返回鈕只佔字的寬度：原本整列透明（看不到的大按鈕），打字時點空白處收鍵盤會誤觸回首頁 */
 .btn.small{display:inline-block;width:auto;padding:8px 14px;font-size:14px;margin:6px 6px 0 0}
 .btn.danger{background:var(--danger)}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>如菓現場回報</title>
-<link rel="stylesheet" href="style.css?v=20261022d">
+<link rel="stylesheet" href="style.css?v=20261022e">
 </head>
 <body>
 <div class="wrap">
@@ -115,14 +115,14 @@
     <button class="btn link" data-back>返回</button>
   </section>
 </div>
-<script src="config.js?v=20261022d"></script>
-<script src="logic.js?v=20261022d"></script>
+<script src="config.js?v=20261022e"></script>
+<script src="logic.js?v=20261022e"></script>
 <script>
   (function () {
     var q = new URLSearchParams(location.search);
     var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
     var src = local && q.get('mock') === '1' ? 'mock-liff.js' : 'https://static.line-scdn.net/liff/edge/2/sdk.js';
-    document.write('<script src="' + src + '"><\/script><script src="app.js?v=20261022d"><\/script>');
+    document.write('<script src="' + src + '"><\/script><script src="app.js?v=20261022e"><\/script>');
   })();
 </script>
 </body>

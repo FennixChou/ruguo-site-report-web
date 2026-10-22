@@ -7,7 +7,62 @@
   var st = { init: null, site: '', photos: { daily: [], defect: [] }, nextSeq: { daily: 1, defect: 1 }, formKey: { daily: '', defect: '' },
     startedAt: { daily: '', defect: '' }, trades: [], sel: {}, sending: false, relogin: false, lastDefect: null };
 
-  function show(id) { VIEWS.forEach(function (v) { $(v).classList.toggle('hidden', v !== id); }); window.scrollTo(0, 0); }
+  var SUB = ['v-daily', 'v-defect', 'v-mine', 'v-done'];
+  function curView() { for (var i = 0; i < VIEWS.length; i++) if (!$(VIEWS[i]).classList.contains('hidden')) return VIEWS[i]; return ''; }
+  function show(id) {
+    VIEWS.forEach(function (v) { $(v).classList.toggle('hidden', v !== id); }); window.scrollTo(0, 0);
+    // 子畫面在瀏覽紀錄墊一層：iOS 左緣右滑／Android 返回鍵只回到本 app 首頁，不會退到 LIFF 轉址頁而整頁重載
+    try {
+      var top = history.state && history.state.rsrSub;
+      if (SUB.indexOf(id) >= 0 && !top) history.pushState({ rsrSub: 1 }, '');
+      else if (SUB.indexOf(id) < 0 && top) history.replaceState(null, '');
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------------- 填寫中內容（打到一半離開／整頁重載後可恢復；送出成功即清除）
+  function wipKey(kind) { return 'rsr.wip.' + kind; }
+  function wipGet(kind) {
+    try {
+      var w = JSON.parse(localStorage.getItem(wipKey(kind)) || 'null');
+      if (!w || !st.init || w.site !== st.site || w.day !== st.init.today) return null;
+      return w;
+    } catch (e) { return null; }
+  }
+  function wipClear(kind) { try { localStorage.removeItem(wipKey(kind)); } catch (e) {} }
+  function wipSave(kind, open) {
+    if (!st.init || !st.site) return;
+    var w = { site: st.site, day: st.init.today, at: Date.now(), open: open !== false, photos: st.photos[kind].length };
+    if (kind === 'daily') {
+      var det = {};
+      document.querySelectorAll('#d-details [data-hc]').forEach(function (x) { var pc = document.querySelector('[data-pc="' + x.dataset.hc + '"]'); det[x.dataset.hc] = [x.value, pc ? pc.value : '']; });
+      w.f = { summary: $('d-summary').value, tomorrow: $('d-tomorrow').value, issue: $('d-issue').value, date: $('d-date').value, trades: st.trades.slice(), det: det };
+    } else {
+      w.f = { space: st.sel.space || '', type: st.sel.type || '', sevlabel: st.sel.sevlabel || '', spaceNote: $('q-spacenote').value, desc: $('q-desc').value, trade: $('q-trade').value, source: $('q-source').value };
+    }
+    try { localStorage.setItem(wipKey(kind), JSON.stringify(w)); } catch (e) {}
+  }
+  function kindOf(view) { return view === 'v-daily' ? 'daily' : view === 'v-defect' ? 'defect' : ''; }
+  function dirty(kind) {
+    if (!kind) return false;
+    if (st.photos[kind].length) return true;
+    return kind === 'daily' ? !!($('d-summary').value.trim() || $('d-issue').value.trim()) : !!($('q-desc').value.trim() || $('q-spacenote').value.trim());
+  }
+  var LEAVE_Q = '還沒送出，要先回首頁嗎？（已填的內容會保留，回來可以接著填）';
+  // 回首頁：有墊的那層就交給 popstate 收（瀏覽紀錄不會越疊越多），否則直接重抓首頁
+  function goHome(ask) {
+    var k = kindOf(curView());
+    if (ask && dirty(k) && !confirm(LEAVE_Q)) return;
+    if (k) wipSave(k, false);
+    if (history.state && history.state.rsrSub) { st.leaving = true; history.back(); } else boot();
+  }
+  window.addEventListener('popstate', function () {
+    var v = curView();
+    if (SUB.indexOf(v) < 0) return;
+    if (!st.leaving && dirty(kindOf(v)) && !confirm(LEAVE_Q)) { try { history.pushState({ rsrSub: 1 }, ''); } catch (e) {} return; }
+    st.leaving = false;
+    if (kindOf(v)) wipSave(kindOf(v), false);
+    boot();
+  });
   function msg(el, text, kind) { el.textContent = text || ''; el.className = 'msg ' + (kind || '') + (text ? '' : ' hidden'); }
   function fatal(text) { msg($('fatal'), text, 'bad'); }
   function esc(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -203,7 +258,7 @@
     }
   }
   function resetForm(kind) {
-    st.photos[kind] = []; st.nextSeq[kind] = 1; st.formKey[kind] = ''; renderThumbs(kind);
+    st.photos[kind] = []; st.nextSeq[kind] = 1; st.formKey[kind] = ''; renderThumbs(kind); wipClear(kind);
     if (kind === 'daily') { $('d-summary').value = ''; $('d-issue').value = ''; }
     else { $('q-desc').value = ''; $('q-spacenote').value = ''; st.sel = {}; }
   }
@@ -277,13 +332,24 @@
     var today = st.init.today, opts = [today];
     for (var i = 1; i <= st.init.settings.BACKFILL_DAYS; i++) opts.push(L.fmtLocal(L.parseLocal(today + ' 12:00') - i * 86400000).slice(0, 10));
     $('d-date').innerHTML = opts.map(function (d, i) { return '<option value="' + d + '">' + d + (i === 0 ? '（今天）' : '（補報）') + '</option>'; }).join('');
+    var w = wipGet('daily'), f = w && w.f;
     st.trades = [];
     chipGroup('d-trades', st.init.codes.trades, 'trade', true);
-    (s.todayTrades || []).forEach(function (t) { pressChip('d-trades', t); });
+    ((f ? f.trades : s.todayTrades) || []).forEach(function (t) { pressChip('d-trades', t); });
     renderDetails();
     $('d-tomorrow').value = s.nextTrade || '';
     msg($('d-msg'), '');
-    renderHeader('日報'); show('v-daily');
+    if (f) {
+      $('d-summary').value = f.summary || ''; $('d-tomorrow').value = f.tomorrow || ''; $('d-issue').value = f.issue || '';
+      if (f.issue) $('d-issue').closest('details').open = true;
+      if (opts.indexOf(f.date) >= 0) $('d-date').value = f.date;
+      Object.keys(f.det || {}).forEach(function (t) {
+        var hc = document.querySelector('[data-hc="' + t + '"]'), pc = document.querySelector('[data-pc="' + t + '"]');
+        if (hc) hc.value = f.det[t][0]; if (pc) pc.value = f.det[t][1];
+      });
+      if (w.photos > st.photos.daily.length) msg($('d-msg'), '已恢復剛才填到一半的文字；照片請重新拍／選。', 'warn');
+    }
+    renderHeader('日報'); show('v-daily'); wipSave('daily');
   }
   function openDefect(keep) {
     if (!st.site) return fatal('請先選案場');
@@ -298,7 +364,14 @@
     $('q-source').value = s.phase === '待交屋' ? '交屋驗收' : '施工自檢';
     if (keep) { pressChip('q-space', keep.space); $('q-spacenote').value = keep.spaceNote || ''; $('q-source').value = keep.source; }
     msg($('q-msg'), '');
-    renderHeader('缺失'); show('v-defect');
+    var w = !keep && wipGet('defect'), f = w && w.f;
+    if (f) {
+      if (f.space) pressChip('q-space', f.space); if (f.type) pressChip('q-type', f.type); if (f.sevlabel) pressChip('q-sev', f.sevlabel);
+      $('q-spacenote').value = f.spaceNote || ''; $('q-desc').value = f.desc || '';
+      if (f.trade) $('q-trade').value = f.trade; if (f.source) $('q-source').value = f.source;
+      if (w.photos > st.photos.defect.length) msg($('q-msg'), '已恢復剛才填到一半的文字；照片請重新拍／選。', 'warn');
+    }
+    renderHeader('缺失'); show('v-defect'); wipSave('defect');
   }
 
   // ---------------------------------------------------------------- 我的回報（缺失改善／複查）
@@ -375,7 +448,8 @@
     $('d-date').onchange = function () { var d = this.value; st.photos.daily.forEach(function (p) { p.check = p.timeSource === '無' ? p.check : L.windowCheck(p.shotAt, d, Date.now(), st.init.settings.PHOTO_WINDOW_H); }); renderThumbs('daily'); };
     document.body.addEventListener('click', function (e) {
       var t = e.target;
-      if (t.matches('[data-back]')) { boot(); return; }
+      if (t.matches('[data-back]')) { goHome(true); return; }
+      if (t.closest('[data-chip]') || t.dataset.rm) { var k0 = kindOf(curView()); if (k0) wipSave(k0); }
       if (t.dataset.rm) { var p = t.dataset.rm.split(':'); st.photos[p[0]].splice(+p[1], 1); renderThumbs(p[0]); return; }
       if (t.dataset.resend) { resend(t.dataset.resend); return; }
       if (t.dataset.drop) { if (confirm('確定捨棄這份未送出的回報？')) draftDel(t.dataset.drop).then(refreshDrafts); return; }
@@ -383,9 +457,11 @@
       if (t.dataset.reject) { review(t.dataset.reject, 'reject'); return; }
     });
     document.body.addEventListener('change', function (e) { var t = e.target; if (t.dataset && t.dataset.imp) improve(t.dataset.imp, t.files, Number(t.dataset.seq)); });
-    $('done-again').onclick = function () { boot(); };
+    // 打字隨手存（只寫手機本機，不重繪、不換頁）
+    ['input', 'change'].forEach(function (ev) { document.body.addEventListener(ev, function () { var k = kindOf(curView()); if (k) wipSave(k); }); });
+    $('done-again').onclick = function () { goHome(false); };
     $('done-same').onclick = function () { openDefect(st.lastDefect); };
-    $('done-close').onclick = function () { if (liff.isInClient && liff.isInClient()) liff.closeWindow(); else boot(); };
+    $('done-close').onclick = function () { if (liff.isInClient && liff.isInClient()) liff.closeWindow(); else goHome(false); };
   }
 
   function boot() {
@@ -402,7 +478,13 @@
       if (!codes.length) { fatal('目前沒有可回報的案場'); }
       renderHome();
       var q = new URLSearchParams(location.search);
-      if (!boot.routed) { boot.routed = true; if (q.get('p') === 'mine') openMine(); else if (q.get('t') === 'daily') openDaily(); else if (q.get('t') === 'defect') openDefect(null); }
+      if (!boot.routed) {
+        boot.routed = true;
+        // 整頁重載（背景回收、滑動返回退到 LIFF 轉址頁）後，回到剛才填到一半的表單
+        var wd = wipGet('daily'), wq = wipGet('defect'), fresh = function (w) { return !!(w && w.open && Date.now() - w.at < 2 * 3600000); };
+        if (q.get('p') === 'mine') openMine(); else if (q.get('t') === 'daily') openDaily(); else if (q.get('t') === 'defect') openDefect(null);
+        else if (fresh(wd) && (!fresh(wq) || wd.at >= wq.at)) openDaily(); else if (fresh(wq)) openDefect(null);
+      }
     }, function () { $('siteline').textContent = '離線'; fatal('網路不穩，連不上系統。未送出的回報仍保存在這支手機。'); });
   }
 
