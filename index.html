@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>如菓現場回報</title>
+<link rel="stylesheet" href="style.css?v=20261022a">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">如菓現場回報</div>
+    <div class="site-line" id="siteline">載入中…</div>
+  </header>
+
+  <div class="banner hidden" id="draftbar"></div>
+  <div class="msg bad hidden" id="fatal"></div>
+
+  <section id="v-consent" class="hidden">
+    <div class="card">
+      <h2 id="consent-title">個資告知</h2>
+      <div class="note" id="consent-ver"></div>
+      <div class="consent-text" id="consent-text" tabindex="0"></div>
+      <button class="btn" id="consent-agree">我已閱讀並同意</button>
+      <div class="msg hidden" id="consent-msg"></div>
+    </div>
+  </section>
+
+  <section id="v-home" class="hidden">
+    <div class="card">
+      <label class="lbl" for="site">案場</label>
+      <select id="site" class="input"></select>
+      <div class="note" id="sitestat"></div>
+    </div>
+    <button class="btn big" id="go-daily">日報</button>
+    <div class="row2">
+      <button class="btn secondary" id="go-defect">開缺失</button>
+      <button class="btn secondary" id="go-mine">我的回報</button>
+    </div>
+  </section>
+
+  <section id="v-daily" class="hidden">
+    <div class="card">
+      <div class="lbl">照片（今天拍的，至少 1 張）</div>
+      <label class="btn photo-btn" for="d-photos">拍照／選照片</label>
+      <input type="file" id="d-photos" accept="image/*" multiple class="vh">
+      <div class="note">避免拍到人臉與屋主私人物品</div>
+      <div class="thumbs" id="d-thumbs"></div>
+    </div>
+    <div class="card">
+      <label class="lbl" for="d-summary">今天一句話 <span class="req">必填</span></label>
+      <textarea id="d-summary" class="input" rows="3" placeholder="例：主臥系統櫃門片裝完，明天水電收尾"></textarea>
+      <div class="lbl mt">今日工種</div>
+      <div class="chips" id="d-trades"></div>
+      <div id="d-details"></div>
+      <label class="lbl mt" for="d-tomorrow">明日預定</label>
+      <input id="d-tomorrow" class="input">
+      <details class="mt"><summary>有問題要回報</summary>
+        <textarea id="d-issue" class="input" rows="2" placeholder="需要支援或待處理的事"></textarea>
+      </details>
+      <label class="lbl mt" for="d-date">回報日</label>
+      <select id="d-date" class="input"></select>
+    </div>
+    <button class="btn" id="d-send">送出日報</button>
+    <button class="btn link" data-back>返回</button>
+    <div class="msg hidden" id="d-msg"></div>
+  </section>
+
+  <section id="v-defect" class="hidden">
+    <div class="card">
+      <div class="lbl">照片（近景＋遠景，至少 1 張今天拍的）</div>
+      <label class="btn photo-btn" for="q-photos">拍照／選照片</label>
+      <input type="file" id="q-photos" accept="image/*" multiple class="vh">
+      <div class="thumbs" id="q-thumbs"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">位置 <span class="req">必填</span></div>
+      <div class="chips" id="q-space"></div>
+      <input id="q-spacenote" class="input mt" placeholder="補述，例：衣櫃左門片">
+      <div class="lbl mt">缺失類型 <span class="req">必填</span></div>
+      <div class="chips" id="q-type"></div>
+      <label class="lbl mt" for="q-desc">描述 <span class="req">必填</span></label>
+      <input id="q-desc" class="input" placeholder="例：門片右下刮傷約 3 公分">
+      <div class="lbl mt">嚴重度 <span class="req">必填</span></div>
+      <div class="chips" id="q-sev"></div>
+      <label class="lbl mt" for="q-trade">指派工種</label>
+      <select id="q-trade" class="input"></select>
+      <label class="lbl mt" for="q-source">來源</label>
+      <select id="q-source" class="input"></select>
+      <div class="note mt" id="q-deadline-note">期限由系統依嚴重度自動帶入</div>
+    </div>
+    <button class="btn" id="q-send">送出缺失</button>
+    <button class="btn link" data-back>返回</button>
+    <div class="msg hidden" id="q-msg"></div>
+  </section>
+
+  <section id="v-done" class="hidden">
+    <div class="card center">
+      <div class="done-big">已送出</div>
+      <div id="done-id" class="mono"></div>
+      <div id="done-detail" class="note"></div>
+      <div id="done-flags"></div>
+    </div>
+    <button class="btn" id="done-again">再回報一筆</button>
+    <button class="btn secondary hidden" id="done-same">同位置再開一筆缺失</button>
+    <button class="btn link" id="done-close">關閉</button>
+  </section>
+
+  <section id="v-mine" class="hidden">
+    <h2 class="h2">待處理缺失</h2>
+    <div id="mine-defects"></div>
+    <h2 class="h2">我這週的日報</h2>
+    <div id="mine-daily"></div>
+    <button class="btn link" data-back>返回</button>
+  </section>
+</div>
+<script src="config.js?v=20261022a"></script>
+<script src="logic.js?v=20261022a"></script>
+<script>
+  (function () {
+    var q = new URLSearchParams(location.search);
+    var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    var src = local && q.get('mock') === '1' ? 'mock-liff.js' : 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+    document.write('<script src="' + src + '"><\/script><script src="app.js?v=20261022a"><\/script>');
+  })();
+</script>
+</body>
+</html>
