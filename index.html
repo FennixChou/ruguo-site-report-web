@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <title>如菓現場回報</title>
-<link rel="stylesheet" href="style.css?v=20261022a">
+<link rel="stylesheet" href="style.css?v=20261022b">
 </head>
 <body>
 <div class="wrap">
@@ -22,7 +22,12 @@
       <h2 id="consent-title">個資告知</h2>
       <div class="note" id="consent-ver"></div>
       <div class="consent-text" id="consent-text" tabindex="0"></div>
-      <button class="btn" id="consent-agree">我已閱讀並同意</button>
+      <fieldset class="choice" id="consent-geo">
+        <legend class="lbl">定位選項（擇一）<span class="req">必選</span></legend>
+        <label class="radio"><input type="radio" name="geo" value="同意"> 同意於按下「送出」當下讀取一次定位</label>
+        <label class="radio"><input type="radio" name="geo" value="不同意"> 不同意讀取定位（回報時不提供定位）</label>
+      </fieldset>
+      <button class="btn" id="consent-agree">同意並開始使用</button>
       <div class="msg hidden" id="consent-msg"></div>
     </div>
   </section>
@@ -112,17 +117,23 @@
     <div id="mine-defects"></div>
     <h2 class="h2">我這週的日報</h2>
     <div id="mine-daily"></div>
+    <h2 class="h2">定位設定</h2>
+    <div class="card">
+      <div id="geo-state"></div>
+      <button class="btn small secondary" id="geo-toggle"></button>
+      <div class="note" id="geo-msg"></div>
+    </div>
     <button class="btn link" data-back>返回</button>
   </section>
 </div>
-<script src="config.js?v=20261022a"></script>
-<script src="logic.js?v=20261022a"></script>
+<script src="config.js?v=20261022b"></script>
+<script src="logic.js?v=20261022b"></script>
 <script>
   (function () {
     var q = new URLSearchParams(location.search);
     var local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
     var src = local && q.get('mock') === '1' ? 'mock-liff.js' : 'https://static.line-scdn.net/liff/edge/2/sdk.js';
-    document.write('<script src="' + src + '"><\/script><script src="app.js?v=20261022a"><\/script>');
+    document.write('<script src="' + src + '"><\/script><script src="app.js?v=20261022b"><\/script>');
   })();
 </script>
 </body>

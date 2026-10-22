@@ -53,4 +53,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI","Micr
 .item.overdue{border-color:var(--danger)}
 .badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);margin-left:4px}
 .badge.a{color:var(--danger);border-color:var(--danger)}
+.choice{border:1px solid var(--line);border-radius:10px;padding:8px 12px 10px;margin:0 0 12px}
+.radio{display:flex;gap:8px;align-items:flex-start;padding:8px 0;font-size:15px;cursor:pointer}
+.radio input{margin-top:4px;width:18px;height:18px;flex:none}
 .consent-text{white-space:pre-wrap;max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:10px;margin:10px 0;font-size:14px;background:var(--surface-2)}

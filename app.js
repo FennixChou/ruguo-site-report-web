@@ -101,12 +101,16 @@
     }).join('');
   }
 
-  // ---------------------------------------------------------------- 定位（只在按送出時讀一次）
+  // ---------------------------------------------------------------- 定位（只在按送出時讀一次；不同意者完全不呼叫）
+  function geoAllowed() { return !!(st.init && st.init.consent && st.init.consent.geo === '同意'); }
+  /** 回 {loc, note}：拿不到定位也照常送出，note 記原因（後端只收白名單） */
   function readPos() {
     return new Promise(function (res) {
-      if (!navigator.geolocation) return res(null);
-      navigator.geolocation.getCurrentPosition(function (p) { res({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }); },
-        function () { res(null); }, { enableHighAccuracy: true, timeout: CFG.GEO_TIMEOUT_MS || 15000, maximumAge: 0 });
+      if (!geoAllowed()) return res({ loc: null, note: '不同意定位' });
+      if (!navigator.geolocation) return res({ loc: null, note: '不支援定位' });
+      navigator.geolocation.getCurrentPosition(function (p) { res({ loc: { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }, note: '' }); },
+        function (e) { res({ loc: null, note: e && e.code === 1 ? '權限被拒' : (e && e.code === 3 ? '定位逾時' : '無法取得') }); },
+        { enableHighAccuracy: true, timeout: CFG.GEO_TIMEOUT_MS || 15000, maximumAge: 0 });
     });
   }
 
@@ -171,10 +175,10 @@
     var payload = kind === 'daily' ? buildDaily() : buildDefect();
     var err = precheck(kind, payload);
     if (err) return msg(m, err, 'bad');
-    st.sending = true; btn.disabled = true; msg(m, '定位並送出中…', '');
+    st.sending = true; btn.disabled = true; msg(m, geoAllowed() ? '定位並送出中…' : '送出中…', '');
     if (!st.formKey[kind]) st.formKey[kind] = L.uuid();
-    readPos().then(function (loc) {
-      payload.loc = loc;
+    readPos().then(function (pos) {
+      payload.loc = pos.loc; payload.locNote = pos.note;
       var siteObj = curSite();
       var d = { submitKey: st.formKey[kind], kind: kind, site: st.site, siteName: siteObj ? siteObj.name : st.site, payload: payload,
         photos: st.photos[kind].map(function (p) { return { seq: p.seq, purpose: p.purpose, b64: p.b64, hash: p.hash, shotAt: p.shotAt, timeSource: p.timeSource }; }),
@@ -327,6 +331,7 @@
           '<div>' + esc(d.siteName || d.site) + '｜' + esc(d.space) + '｜' + esc(d.type) + '</div><div>' + esc(d.desc) + '</div>' +
           '<div class="note">指派 ' + esc(d.trade) + '・期限 ' + esc(d.deadline) + (d.overdue ? '（已逾期）' : '') + '</div>' + act + '<div class="note" data-note="' + esc(d.id) + '"></div></div>';
       }).join('') : '<div class="note">沒有待處理的缺失</div>';
+      renderGeo();
       $('mine-daily').innerHTML = r.daily.length ? r.daily.map(function (d) {
         return '<div class="item"><div class="t">' + esc(d.id) + ' <span class="badge">' + esc(d.status) + '</span></div><div>' + esc(d.summary) + '</div><div class="note">照片 ' + d.photos + ' 張' + (d.outside ? '・' + d.outside + ' 張非今天拍不列入' : '') + '</div></div>';
       }).join('') : '<div class="note">這週還沒有日報</div>';
@@ -357,13 +362,32 @@
     }, function () { note.textContent = '網路不穩，請稍後再試'; });
   }
 
+  // ---------------------------------------------------------------- 定位設定（我的回報頁；可隨時改選）
+  function renderGeo() {
+    var on = geoAllowed();
+    $('geo-state').textContent = on ? '目前：同意按下「送出」時讀取一次定位' : '目前：不同意讀取定位（回報不帶定位，照常可送出）';
+    $('geo-toggle').textContent = on ? '改為不同意讀取定位' : '改為同意讀取定位';
+    $('geo-toggle').onclick = function () {
+      var want = on ? '不同意' : '同意';
+      $('geo-toggle').disabled = true;
+      api({ action: 'geoPref', geo: want }).then(function (r) {
+        $('geo-toggle').disabled = false;
+        if (!r.ok) return msg($('geo-msg'), r.message || r.code, 'bad');
+        st.init.consent.geo = r.geo; $('geo-msg').textContent = '已更新'; renderGeo();
+      }, function () { $('geo-toggle').disabled = false; $('geo-msg').textContent = '網路不穩，請稍後再試'; });
+    };
+  }
+
   // ---------------------------------------------------------------- 個資告知
   function renderConsent(c) {
     $('consent-title').textContent = c.title; $('consent-text').textContent = c.text; $('consent-ver').textContent = '版本 ' + c.version + (c.draft ? '（草稿，測試用）' : '');
+    document.querySelectorAll('input[name="geo"]').forEach(function (x) { x.checked = false; }); // 每個版本都要本人重新點選，不預選
     show('v-consent');
     $('consent-agree').onclick = function () {
+      var picked = document.querySelector('input[name="geo"]:checked');
+      if (!picked) return msg($('consent-msg'), '請先選擇定位選項（同意或不同意都可以使用）', 'bad');
       $('consent-agree').disabled = true;
-      api({ action: 'consent', decision: 'agree', version: c.version, hash: c.hash }).then(function (r) {
+      api({ action: 'consent', decision: 'agree', version: c.version, hash: c.hash, geo: picked.value }).then(function (r) {
         $('consent-agree').disabled = false;
         if (!r.ok) return msg($('consent-msg'), r.message || r.code, 'bad');
         boot();
